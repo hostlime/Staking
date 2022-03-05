@@ -179,14 +179,16 @@ contract MyERC20 {
     }
 
     // Функция для сжигания токенов
-    function burn(uint256 _amount) public {
+    function burn(address _user, uint256 _amount) public {
+        // Только овнер может минтить
+        require(msg.sender == owner, "Only owner can burn new tokens");
         // Есть ли у пользователя столько на балансе
-        require(_balanceOf[msg.sender] >= _amount, "burn amount exceeds balanc");
+        require(_balanceOf[_user] >= _amount, "burn amount exceeds balanc");
         // уменяшаем эмиссию
         _totalSupply -= _amount;
         // уменьшаем баланс пользователя _user
-        _balanceOf[msg.sender] -= _amount;
+        _balanceOf[_user] -= _amount;
         // генерируем событие о передаче токенов на нулевой адрес
-        emit Transfer(msg.sender, address(0), _amount);
+        emit Transfer(_user, address(0), _amount);
     }
 }

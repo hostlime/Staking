@@ -67,7 +67,7 @@ contract Staking is AccessControl {
             stakingPool[msg.sender].claimDate = block.timestamp;
         } else {
             if (_durationClaim() >= rewardStakingTime) {
-                // Если пользователь стейкает повторно и еще не прошел
+                // Если пользователь стейкает повторно и уже можно начислить реварды
                 _claim();
             } else {
                 // Записываем инфу о старте стейкинга
@@ -87,8 +87,7 @@ contract Staking is AccessControl {
             "You should wait more time"
         );
         // возвращаем lpToken
-        lpToken.transferFrom(
-            address(this),
+        lpToken.transfer(
             msg.sender,
             stakingPool[msg.sender].amount
         );

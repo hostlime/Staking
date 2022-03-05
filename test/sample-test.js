@@ -2,7 +2,7 @@ const { expect } = require("chai");
 const { utils } = require("ethers");
 const { ethers } = require("hardhat");
 
-describe.only("Staking", function () {
+describe("Staking", function () {
   let staking, myToken, lpToken;
   let rewarPool = 999;
   let tokenPool = 10_000 * 10 ** 18;
@@ -151,33 +151,8 @@ describe.only("Staking", function () {
     // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
     await lpToken.connect(addr1).approve(staking.address, approveToken);
 
-    // Проверяем что allowance == approveToken
-    expect(
-      await lpToken.connect(addr1).allowance(addr1.address, staking.address)
-    ).to.be.equal(approveToken);
-
     // Стейкаем токены
     await staking.connect(addr1).stake(stakeToken);
-
-    // Проверяем количество застейканых токенов
-    expect(await staking.connect(addr1).getMyStakeValue()).to.be.equal(
-      stakeToken
-    );
-
-    // Проверяем что allowance уменьшился на stakeToken
-    expect(
-      await lpToken.connect(addr1).allowance(addr1.address, staking.address)
-    ).to.be.equal(approveToken - stakeToken);
-
-    // Проверяем что на балансе пользователя теперь stakeToken токенов
-    expect(await lpToken.connect(addr1).balanceOf(addr1.address)).to.be.equal(
-      stakeToken
-    );
-
-    // Проверяем что застейканые токены пула теперь на контракте стейкинга
-    expect(await lpToken.connect(addr1).balanceOf(staking.address)).to.be.equal(
-      stakeToken
-    );
 
     //ПОВТОРНО СТЕЙКАЕМ
     // Стейкаем токены
@@ -199,220 +174,172 @@ describe.only("Staking", function () {
       stakeToken * 2
     );
   });
-});
-describe("Checking Token (ERC20)", function () {
-  let erc20;
+  it("checking balance after STAKE() and restake after 10 minutes (claim => check event Transfer)", async function () {
+    let approveToken = 55;
+    let stakeToken = 25;
 
-  const name = "MegaToken";
-  const symbol = "MEGA";
-  const decimals = 18;
+    // Переводим lpToken токены addr1 для дальнейшего стейкинга
+    await lpToken.transfer(addr1.address, stakeToken * 2);
+    // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
+    await lpToken.connect(addr1).approve(staking.address, approveToken);
+    // Стейкаем токены
+    await staking.connect(addr1).stake(stakeToken);
 
-  const mount = 55;
+    // Смещаем время на 10 минут
+    const minutes = 10 * 60;
+    await ethers.provider.send("evm_increaseTime", [minutes]);
+    await ethers.provider.send("evm_mine");
 
-  // создаём экземпляры контракта
-  beforeEach(async () => {
-    [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
-    const ERC20 = await ethers.getContractFactory("MyERC20");
-    erc20 = await ERC20.deploy();
-    await erc20.deployed();
-  });
+    //ПОВТОРНО СТЕЙКАЕМ
+    // Стейкаем токены
+    const tx = await staking.connect(addr1).stake(stakeToken);
 
-  // view функции
-  it("Checking functions - symbol(), decimals(), name(), totalSupply()", async function () {
-    //const totalSupply = 10000 * (10 ** decimals);
-    const totalSupply = ethers.BigNumber.from(ethers.utils.parseEther("10000"));
-    expect(await erc20.totalSupply()).to.equal(totalSupply);
-
-    // name()
-    expect(await erc20.name()).to.equal(name);
-    // symbol()
-    expect(await erc20.symbol()).to.equal(symbol);
-    // decimals()
-    expect(await erc20.decimals()).to.equal(decimals);
-    // totalSupply()
-    const ownerBalance = await erc20.balanceOf(owner.address);
-    expect(await erc20.totalSupply()).to.equal(ownerBalance);
-  });
-
-  it("Checking function mint() event Transfer", async function () {
-    // Проверяем что баланс 0
-    expect(await erc20.balanceOf(addr1.address)).to.equal(0);
-    // Только овнер может минтить токены
-    await expect(
-      erc20.connect(addr1).mint(ethers.constants.AddressZero, mount)
-    ).to.be.revertedWith("Only owner can mint new tokens");
-
-    // проверяем require(_user != address(0), "_user has the zero address");
-    await expect(
-      erc20.connect(owner).mint(ethers.constants.AddressZero, mount)
-    ).to.be.revertedWith("_user has the zero address");
-
-    // ПРОВЕРКА ЕВЕНТА
-    // Овнер минтит адресу addr1 mount токенов
-    const tx = await erc20.mint(addr1.address, mount);
-    // event Transfer
+    // При повторном стейкинге после 10 минут должен вызваться claim()
+    // Проверка Евента о прередаче ревардов (event Transfer)
     //console.log(tx);
-    expect(tx)
-      .to.emit(erc20, "Transfer")
-      .withArgs(ethers.constants.AddressZero, addr1.address, mount);
+    expect(tx).to.emit(myToken, "Transfer")
+      .withArgs(staking.address, addr1.address, stakeToken)
 
-    expect(await erc20.balanceOf(addr1.address)).to.equal(mount);
-  });
-  it("Checking function balanceOf()", async function () {
-    // Проверяем что баланс = 0
-    expect(await erc20.balanceOf(addr1.address)).to.equal(0);
-    expect(await erc20.balanceOf(addr2.address)).to.equal(0);
-
-    const amountAddr1 = 55;
-    const amountAddr2 = 65;
-
-    // Минтим токены для addr1 и addr2
-    await erc20.mint(addr1.address, amountAddr1);
-    await erc20.mint(addr2.address, amountAddr2);
-
-    // Проверяем что токены есть на балансе
-    expect(await erc20.balanceOf(addr1.address)).to.equal(amountAddr1);
-    expect(await erc20.balanceOf(addr2.address)).to.equal(amountAddr2);
-  });
-  it("Checking function transfer(), event Transfer", async function () {
-    const amountAddr1 = 55;
-    const amountAddr2 = 23;
-
-    // проверяем require(_to != address(0), "transfer to the zero address");
-    await expect(
-      erc20.connect(addr1).transfer(ethers.constants.AddressZero, amountAddr1)
-    ).to.be.revertedWith("transfer to the zero address");
-
-    // переводим от овнера amountAddr1 токенов,
-    // чтобы потом проверить что он не сможет перевести amountAddr1 + 1
-    await erc20.transfer(addr1.address, amountAddr1);
-    await expect(
-      erc20.connect(addr1).transfer(addr2.address, amountAddr1 + 1)
-    ).to.be.revertedWith("Do not enough balance");
-
-    // переводим amountAddr2 на addr2
-    await erc20.connect(addr1).transfer(addr2.address, amountAddr2);
-
-    // проверяем балансы адресов
-    expect(await erc20.balanceOf(addr1.address)).to.equal(
-      amountAddr1 - amountAddr2
-    );
-    expect(await erc20.balanceOf(addr2.address)).to.equal(amountAddr2);
-
-    // event Transfer
-    const tx = await erc20.transfer(addr1.address, mount);
-    expect(tx)
-      .to.emit(erc20, "Transfer")
-      .withArgs(owner.address, addr1.address, mount);
-  });
-  it("Checking function event Approval, aprove(), allowance(), increaseAllowance(), decreaseAllowance()", async function () {
-    const amountAddr1 = 55;
-    const amountIncDec = 5;
-    // aprove()
-    const tx = await erc20.approve(addr1.address, amountAddr1);
-
-    // event Approval
-    expect(tx)
-      .to.emit(erc20, "Approval")
-      .withArgs(owner.address, addr1.address, amountAddr1);
-
-    // проверяем require(_spender != address(0), "_spender the zero address");
-    await expect(
-      erc20.connect(owner).approve(ethers.constants.AddressZero, mount)
-    ).to.be.revertedWith("_spender the zero address");
-
-    // allowance
-    expect(await erc20.allowance(owner.address, addr1.address)).to.equal(
-      amountAddr1
+    // Проверяем количество застейканых токенов
+    expect(await staking.connect(addr1).getMyStakeValue()).to.be.equal(
+      stakeToken * 2
     );
 
-    // increaseAllowance()
-    await erc20.increaseAllowance(addr1.address, amountIncDec);
-    expect(await erc20.allowance(owner.address, addr1.address)).to.equal(
-      amountAddr1 + amountIncDec
+    // Проверяем что реварды были начислены
+    expect(await myToken.connect(addr1).balanceOf(addr1.address)).to.be.equal(
+      (stakeToken * rewardProc * minutes) / (100 * rewardStakingTime) // ФОРМУЛА рассчета ревардов  как в контракте
+    );
+  });
+  it("checking UNstake() immediately after STAKE()", async function () {
+    let approveToken = 55;
+    let stakeToken = 25;
+
+    // Переводим lpToken токены addr1 для дальнейшего стейкинга
+    await lpToken.transfer(addr1.address, stakeToken * 2);
+    // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
+    await lpToken.connect(addr1).approve(staking.address, approveToken);
+    // Стейкаем токены
+    await staking.connect(addr1).stake(stakeToken);
+
+    //UNSTAKE()
+    await expect(staking.connect(addr1).unstake()).to.be.revertedWith(
+      "You should wait more time"
+    );
+    // Проверяем что количество застейканых токенов на месте
+    expect(await staking.connect(addr1).getMyStakeValue()).to.be.equal(
+      stakeToken
+    );
+  });
+  it("checking UNstake() after(20m) STAKE(). and also event 2xTransfer", async function () {
+    let approveToken = 55;
+    let stakeToken = 25;
+
+    // Переводим lpToken токены addr1 для дальнейшего стейкинга
+    await lpToken.transfer(addr1.address, stakeToken * 2);
+    // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
+    await lpToken.connect(addr1).approve(staking.address, approveToken);
+    // Стейкаем токены
+    await staking.connect(addr1).stake(stakeToken);
+
+    // Смещаем время на 20 минут
+    const minutes = 20 * 60;
+    await ethers.provider.send("evm_increaseTime", [minutes]);
+    await ethers.provider.send("evm_mine");
+
+    //UNSTAKE()
+    const tx = await staking.connect(addr1).unstake();
+
+    // При вызове unstake() должны вернутьс lptoken и должен вызваться claim() для начисления ревардов
+
+    // Проверка Евента о прередаче lptoken (event Transfer)
+    expect(tx).to.emit(lpToken, "Transfer")
+      .withArgs(staking.address, addr1.address, stakeToken)
+
+    // Проверка Евента о прередаче ревардов (event Transfer)
+    expect(tx).to.emit(myToken, "Transfer")
+      .withArgs(staking.address, addr1.address, stakeToken)
+
+    // Проверяем что количество застейканых токенов = 0
+    expect(await staking.connect(addr1).getMyStakeValue()).to.be.equal(0);
+
+    // Проверяем что lpToken вернулись владельцу
+    expect(await lpToken.connect(addr1).balanceOf(addr1.address)).to.be.equal(stakeToken * 2);
+
+    // Проверяем что награды myToken отправили инвестору
+    expect(await myToken.connect(addr1).balanceOf(addr1.address)).to.be.equal(
+      (stakeToken * rewardProc * minutes) / (100 * rewardStakingTime) // ФОРМУЛА рассчета ревардов  как в контракте
     );
 
-    // проверяем require(_allowance[msg.sender][_spender] >= _decAmount,"decreased allowance below zero");
-    // вытаемся уменьшить количество approve больше чем возможно
-    await expect(
-      erc20
-        .connect(owner)
-        .decreaseAllowance(addr1.address, amountAddr1 * amountAddr1)
-    ).to.be.revertedWith("decreased allowance below zero");
-
-    // decreaseAllowance()
-    await erc20.decreaseAllowance(addr1.address, amountIncDec);
-    expect(await erc20.allowance(owner.address, addr1.address)).to.equal(
-      amountAddr1 + amountIncDec - amountIncDec
-    ); // учитываем предыдущий + amountIncDec
   });
-  it("Checking function transferFrom()", async function () {
-    const amount = 55;
+  it("checking claim() immediately after STAKE()", async function () {
+    let approveToken = 55;
+    let stakeToken = 25;
 
-    // Проверяем перевод если небыло апрува
-    await expect(
-      erc20.connect(addr1).transferFrom(owner.address, addr2.address, amount)
-    ).to.be.revertedWith("Do not enough money");
+    // Переводим lpToken токены addr1 для дальнейшего стейкинга
+    await lpToken.transfer(addr1.address, stakeToken * 2);
+    // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
+    await lpToken.connect(addr1).approve(staking.address, approveToken);
+    // Стейкаем токены
+    await staking.connect(addr1).stake(stakeToken);
 
-    // Проверяем require(_from != address(0), "transfer from the zero address");
-    // в функции _transfer
-    await expect(
-      erc20
-        .connect(addr1)
-        .transferFrom(ethers.constants.AddressZero, addr2.address, amount)
-    ).to.be.revertedWith("transfer from the zero address");
-
-    // Апрувим и проверяем балансы
-    await erc20.approve(addr1.address, amount);
-    expect(await erc20.balanceOf(addr1.address)).to.equal(0);
-    expect(await erc20.balanceOf(addr2.address)).to.equal(0);
-
-    // переводим проапрувенные токены и проверяем
-    await erc20
-      .connect(addr1)
-      .transferFrom(owner.address, addr2.address, amount);
-    expect(await erc20.balanceOf(addr2.address)).to.equal(amount);
-  });
-  it("Checking function burn()", async function () {
-    const amount = 55;
-    // Проверяем что сжигать нечего
-    await expect(erc20.connect(addr1).burn(amount)).to.be.revertedWith(
-      "burn amount exceeds balanc"
+    //CLAIM()
+    await expect(staking.connect(addr1).claim()).to.be.revertedWith(
+      "You should wait more time"
     );
-    // отправляем amount токенов и проверяем баланс
-    await erc20.transfer(addr1.address, amount);
-    expect(await erc20.balanceOf(addr1.address)).to.equal(amount);
-    // Сжигаем и проверяем что теперь баланс = 0
-    await erc20.connect(addr1).burn(amount);
-    expect(await erc20.balanceOf(addr1.address)).to.equal(0);
   });
-  // проверка, что контракт создан овнером
-  it("Checking contract creater is an owner", async function () {
-    expect(await erc20.owner()).to.equal(owner.address);
-  });
+  it("checking claim() immediately after STAKE()", async function () {
+    let approveToken = 55;
+    let stakeToken = 25;
 
-  // проверка, что вся эмиссия у овнера
-  it("Checking Should assign the total supply of tokens to the owner", async function () {
-    const ownerBalance = await erc20.balanceOf(owner.address);
-    expect(await erc20.totalSupply()).to.equal(ownerBalance);
+    // Переводим lpToken токены addr1 для дальнейшего стейкинга
+    await lpToken.transfer(addr1.address, stakeToken * 2);
+    // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
+    await lpToken.connect(addr1).approve(staking.address, approveToken);
+    // Стейкаем токены
+    await staking.connect(addr1).stake(stakeToken);
+
+    //UNSTAKE()
+    await expect(staking.connect(addr1).claim()).to.be.revertedWith(
+      "You should wait more time"
+    );
+  });
+  it("checking claim() after(1h) STAKE()", async function () {
+    let approveToken = 55;
+    let stakeToken = 25;
+
+    // Переводим lpToken токены addr1 для дальнейшего стейкинга
+    await lpToken.transfer(addr1.address, stakeToken * 2);
+    // Разрешаем перевод "approveToken" токенов от addr1 на контракт стейкинга
+    await lpToken.connect(addr1).approve(staking.address, approveToken);
+    // Стейкаем токены
+    await staking.connect(addr1).stake(stakeToken);
+
+    // Смещаем время на 60 минут
+    const minutes = 60 * 60;
+    await ethers.provider.send("evm_increaseTime", [minutes]);
+    await ethers.provider.send("evm_mine");
+
+    //claim()
+    // При вызове claim() должны начислиться реварды myToken
+    const tx = await staking.connect(addr1).claim();
+    // ФОРМУЛА рассчета ревардов  как в контракте
+    const myReward = (stakeToken * rewardProc * minutes) / (100 * rewardStakingTime);
+
+    // Проверка Евента о прередаче myToken (event Transfer)
+    expect(tx).to.emit(myToken, "Transfer")
+      .withArgs(
+        staking.address, 
+        addr1.address, 
+        myReward)
+
+    // Проверяем что количество застейканых ТЕПЕРЬ токенов = 0
+    expect(await staking.connect(addr1).getMyStakeValue()).to.be.equal(stakeToken);
+
+    // Проверяем что lpToken вернулись владельцу
+    expect(await lpToken.connect(addr1).balanceOf(addr1.address)).to.be.equal(stakeToken);
+
+    // Проверяем что награды myToken отправили инвестору
+    expect(await myToken.connect(addr1).balanceOf(addr1.address)).to.be.equal(myReward);
+
   });
 });
-
-/*
-describe("Greeter", function () {
-  it("Should return the new greeting once it's changed", async function () {
-    const Greeter = await ethers.getContractFactory("Greeter");
-    const greeter = await Greeter.deploy("Hello, world!");
-    await greeter.deployed();
-
-    expect(await greeter.greet()).to.equal("Hello, world!");
-
-    const setGreetingTx = await greeter.setGreeting("Hola, mundo!");
-
-    // wait until the transaction is mined
-    await setGreetingTx.wait();
-
-    expect(await greeter.greet()).to.equal("Hola, mundo!");
-  });
-});
-*/
