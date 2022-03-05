@@ -1,42 +1,63 @@
-# Advanced Sample Hardhat Project
+# Staking lpToken
 
-This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
+Cмарт-контракт стейкинга, работает с пулом ликвидности uniswapV2. Контракт стейкинга принимает ЛП токены, после определенного времени пользователю начисляются награды в виде ревард токенов ERC20. 
+Количество токенов зависит от суммы застейканных ЛП токенов (20 процентов). Вывести застейканные ЛП токены можно после определенного времени.
+- Cсылка на контракт в сети rinkeby https://rinkeby.etherscan.io/address/0x597974e59862f5d1b66c5c47561fb0ab1#code
+- Ссылка на пул uniswapV2 https://rinkeby.etherscan.io/address/0x597974e59862fc896d1b66c5c478ad4161fb0fb4#code
 
-The project comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts. It also comes with a variety of other tools, preconfigured to work with the project code.
 
-Try running some of the following tasks:
+### npx hardhat coverage
 
 ```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-npx hardhat help
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
-npx hardhat run scripts/deploy.js
-node scripts/deploy.js
-npx eslint '**/*.js'
-npx eslint '**/*.js' --fix
-npx prettier '**/*.{json,sol,md}' --check
-npx prettier '**/*.{json,sol,md}' --write
-npx solhint 'contracts/**/*.sol'
-npx solhint 'contracts/**/*.sol' --fix
+--------------|----------|----------|----------|----------|----------------|
+File          |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
+--------------|----------|----------|----------|----------|----------------|
+ contracts\   |      100 |    96.55 |      100 |      100 |                |
+  ERC20.sol   |      100 |    95.45 |      100 |      100 |                |
+  LpERC20.sol |      100 |    95.45 |      100 |      100 |                |
+  Staking.sol |      100 |      100 |      100 |      100 |                |
+--------------|----------|----------|----------|----------|----------------|
+All files     |      100 |    96.55 |      100 |      100 |                |
+--------------|----------|----------|----------|----------|----------------|
 ```
-
-# Etherscan verification
-
-To try out Etherscan verification, you first need to deploy a contract to an Ethereum network that's supported by Etherscan, such as Ropsten.
-
-In this project, copy the .env.example file to a file named .env, and then edit it to fill in the details. Enter your Etherscan API key, your Ropsten node URL (eg from Alchemy), and the private key of the account which will send the deployment transaction. With a valid .env file in place, first deploy your contract:
+### npx hardhat test
 
 ```shell
-hardhat run --network ropsten scripts/deploy.js
-```
+  Checking lpToken (ERC20)
+    ✔ Checking functions - symbol(), decimals(), name(), totalSupply() (160ms)
+    ✔ Checking function mint() event Transfer (184ms)
+    ✔ Checking function balanceOf() (108ms)
+    ✔ Checking function transfer(), event Transfer (177ms)
+    ✔ Checking function event Approval, aprove(), allowance(), increaseAllowance(), decreaseAllowance() (162ms)
+    ✔ Checking function transferFrom() (144ms)
+    ✔ Checking function burn() (313ms)
+    ✔ Checking contract creater is an owner
+    ✔ Checking Should assign the total supply of tokens to the owner
 
-Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_ADDRESS` in this command:
+  Checking myToken (ERC20)
+    ✔ Checking functions - symbol(), decimals(), name(), totalSupply() (66ms)
+    ✔ Checking function mint() event Transfer (89ms)
+    ✔ Checking function balanceOf() (79ms)
+    ✔ Checking function transfer(), event Transfer (126ms)
+    ✔ Checking function event Approval, aprove(), allowance(), increaseAllowance(), decreaseAllowance() (133ms)
+    ✔ Checking function transferFrom() (121ms)
+    ✔ Checking function burn() (108ms)
+    ✔ Checking contract creater is an owner
+    ✔ Checking Should assign the total supply of tokens to the owner
 
-```shell
-npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
+  Staking
+    ✔ Checking staking contract has reward pool
+    ✔ Checking LpToken has tokens
+    ✔ checking that change setting pool can only an owner (186ms)
+    ✔ checking that can't stake `0`
+    ✔ checking that can't unstake if you have't stake
+    ✔ checking that can't clame if you have't stake
+    ✔ checking balance after STAKE() (159ms)
+    ✔ checking balance after STAKE()  restaking (152ms)
+    ✔ checking balance after STAKE() and restake after 10 minutes (claim => check event Transfer) (164ms)
+    ✔ checking UNstake() immediately after STAKE() (104ms)
+    ✔ checking UNstake() after(20m) STAKE(). and also event 2xTransfer (167ms)
+    ✔ checking claim() immediately after STAKE() (94ms)
+    ✔ checking claim() immediately after STAKE() (88ms)
+    ✔ checking claim() after(1h) STAKE() (141ms)
 ```
