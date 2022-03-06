@@ -20,7 +20,7 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 
-
+// npx hardhat claim  --contract 0x61b08Db0d2559cFE85fae3bA5C9998Ed066A8e4b  --network rinkeby
 // Функция claim() - списывает с контракта стейкинга ревард токены доступные в качестве наград
 task("claim", "Claim reward MEGA(ERC20) tokens")
   .addParam("contract", "address of deployed staking contract")
@@ -30,7 +30,8 @@ task("claim", "Claim reward MEGA(ERC20) tokens")
     tx.wait()
   })
 
-//Функция stake(uint256 amount) - списывает с пользователя на контракт стейкинга ЛП токены в количестве amount, обновляет в контракте баланс пользователя
+// npx hardhat stake  --contract 0x61b08Db0d2559cFE85fae3bA5C9998Ed066A8e4b --value 555  --network rinkeby
+// Функция stake(uint256 amount) - списывает с пользователя на контракт стейкинга ЛП токены в количестве amount, обновляет в контракте баланс пользователя
 task("stake", "stake UniswapV2(UNI-V2) tokens")
   .addParam("contract", "address of deployed staking contract")
   .addParam("value", "amount tokens to stake")
@@ -41,6 +42,7 @@ task("stake", "stake UniswapV2(UNI-V2) tokens")
     console.log("You have " + (await Staking.getMyStakeValue()) + " lpTokens in staking")
   })
 
+ // npx hardhat unstake  --contract 0x61b08Db0d2559cFE85fae3bA5C9998Ed066A8e4b  --network rinkeby
  // Функция unstake() - списывает с контракта стейкинга ЛП токены доступные для вывода
 task("unstake", "Unstake and get reward MEGA(ERC20) tokens")
   .addParam("contract", "address of deployed staking contract")
@@ -55,18 +57,6 @@ task("getstakevalue", "Get stake amount")
     const Staking = await hre.ethers.getContractAt("Staking", taskArgs.contract)
     const tx = await Staking.getMyStakeValue()
     console.log(tx.toString())
-  })
-
-task("approve", "approves lptokens for staking contract")
-  .addParam("lpcontract", "address of deployed ERC20 LPcontract")
-  .addParam("stakecontract", "address to approve")
-  .addParam("value", "value to approve")
-  .setAction(async (taskArgs, hre) => {
-    const [owner] = await hre.ethers.getSigners();
-    const erc20 = await hre.ethers.getContractAt("UniswapV2Pair", taskArgs.lpcontract)
-    await erc20.factory()
-    //const tx = await erc20.approve(taskArgs.stakecontract, taskArgs.value)
-    //console.log(tx.toString())
   })
 
 
