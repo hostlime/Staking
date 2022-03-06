@@ -14,12 +14,22 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
+  const UniswapV2Pair = '0x597974e59862fc896d1b66c5c478ad4161fb0fb4'; // Uniswap V2 (UNI-V2) https://rinkeby.etherscan.io/address/0x597974e59862fc896d1b66c5c478ad4161fb0fb4
+  const myToken       = '0xefdb0b230c136b567bd7b4a5448875b3a68f47aa'; // MegaToken (MEGA) https://rinkeby.etherscan.io/address/0xefdb0b230c136b567bd7b4a5448875b3a68f47aa
+  
   const Staking = await hre.ethers.getContractFactory("Staking");
-  const staking = await Staking.deploy("Hello, Hardhat!");
+  const staking = await Staking.deploy(
+    UniswapV2Pair, 
+    myToken);
 
   await staking.deployed();
 
   console.log(" deployed to:", staking.address);
+
+ // await hre.run("verify", {
+ //   address: staking.address,
+ //   constructorArgs: [UniswapV2Pair, myToken]
+ // })
 }
 
 // We recommend this pattern to be able to use async/await everywhere

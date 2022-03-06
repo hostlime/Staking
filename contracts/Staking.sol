@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract Staking is AccessControl {
-    ERC20 internal lpToken; // = ERC20(0x597974e59862fc896d1b66c5c478ad4161fb0fb4);
-    ERC20 internal myToken; // = 0xefdb0b230c136b567bd7b4a5448875b3a68f47aa;
+    ERC20 internal lpToken; // contract Uniswap V2 (UNI-V2) 0x597974e59862fc896d1b66c5c478ad4161fb0fb4;
+    ERC20 internal myToken; // = contract MEGA token (ERC20) 0xefdb0b230c136b567bd7b4a5448875b3a68f47aa;
 
     uint256 public rewardProc = 20; // Процент наград за стейкинг
     uint256 public rewardStakingTime = 10 * 1 minutes; // время спустя которое начисляются реварды
@@ -15,12 +15,12 @@ contract Staking is AccessControl {
     // создаем наименование роли админа
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    struct userStake {
+    struct UserStake {
         uint256 stakingDate;
         uint256 claimDate;
         uint256 amount;
     }
-    mapping(address => userStake) internal stakingPool;
+    mapping(address => UserStake) internal stakingPool;
 
     modifier onlyStaker() {
         // Проверяем есть ли застейканые токены?
@@ -94,7 +94,7 @@ contract Staking is AccessControl {
         // Возвращаем реварды
         _claim();
         // обнуляем баланс стейкинга
-        stakingPool[msg.sender] = userStake({
+        stakingPool[msg.sender] = UserStake({
             stakingDate: 0,
             claimDate: 0,
             amount: 0
@@ -134,23 +134,3 @@ contract Staking is AccessControl {
         withdrawStakingTime = _withdrawStakingTime; // время спустя которое доступен вывод ревардов
     }
 }
-
-/*
-Техническое задание на неделю 2 (стейкинг)
-- Написать смарт-контракт стейкинга, создать пул ликвидности на uniswap в тестовой сети. Контракт стейкинга принимает ЛП токены, 
-после определенного времени (например 10 минут) пользователю начисляются награды в виде ревард токенов написанных на первой неделе. 
-Количество токенов зависит от суммы застейканных ЛП токенов (например 20 процентов). 
-Вывести застейканные ЛП токены также можно после определенного времени (например 20 минут).
-- Создать пул ликвидности
-- Реализовать функционал стейкинга в смарт контракте
-- Написать полноценные тесты к контракту
-- Написать скрипт деплоя
-- Задеплоить в тестовую сеть
-- Написать таски на stake, unstake, claim
-- Верифицировать контракт
-Требования
-- Функция stake(uint256 amount) - списывает с пользователя на контракт стейкинга ЛП токены в количестве amount, обновляет в контракте баланс пользователя
-- Функция claim() - списывает с контракта стейкинга ревард токены доступные в качестве наград
-- Функция unstake() - списывает с контракта стейкинга ЛП токены доступные для вывода
-- Функции админа для изменения параметров стейкинга (время заморозки, процент)
-*/
